@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: book-summarizer
+  labels:
+    app: book-summarizer
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: book-summarizer
+  template:
+    metadata:
+      labels:
+        app: book-summarizer
+    spec:
+      containers:
+      - name: book-summarizer
+        # This image will be updated by your CI process.
+        image: gcr.io/YOUR_GCP_PROJECT_ID/book-summarizer:latest
+        ports:
+        - containerPort: 8501
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        env:
+        - name: OLLAMA_HOST
+          value: "http://ollama-service:11434"
+        volumeMounts:
+        - name: uploads
+          mountPath: /app/uploads
+        - name: outputs
+          mountPath: /app/outputs
+      volumes:
+      - name: uploads
+        emptyDir: {}
+      - name: outputs
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: book-summarizer-service
+spec:
+  selector:
+    app: book-summarizer
+  ports:
+  - port: 80
+    targetPort: 8501
+  type: LoadBalancer
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: book-summarizer-ingress
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.allow-http: "true"
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /*
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: book-summarizer-service
+            port:
+              number: 80
